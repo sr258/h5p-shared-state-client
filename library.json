@@ -1,0 +1,16 @@
+{
+    "title": "H5P Shared State Client",
+    "description": "The client for the H5P shared stated extension",
+    "majorVersion": 0,
+    "minorVersion": 1,
+    "patchVersion": 1,
+    "runnable": 0,
+    "author": "Sebastian Rettig <serettig@posteo.de>",
+    "license": "MIT",
+    "machineName": "H5P.SharedStateClient",
+    "preloadedJs": [
+        {
+            "path": "dist/h5p-shared-state-client.js"
+        }
+    ]
+}

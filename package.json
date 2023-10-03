@@ -1,0 +1,52 @@
+{
+  "name": "h5p-shared-state-client",
+  "version": "0.1.0",
+  "description": "The client for the H5P shared stated extension",
+  "main": "",
+  "scripts": {
+    "build": "cross-env NODE_ENV=production ./node_modules/.bin/webpack",
+    "build:dev": "cross-env NODE_ENV=development ./node_modules/.bin/webpack",
+    "build:watch": "./node_modules/.bin/webpack --watch",
+    "lint": "eslint ./src --ext .js,.jsx,.ts,.tsx"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/sr258/h5p-shared-state-client.git"
+  },
+  "keywords": [
+    "h5p",
+    "library",
+    "sharedb"
+  ],
+  "author": "Sebastian Rettig <serettig@posteo.de>",
+  "license": "MIT",
+  "devDependencies": {
+    "@babel/cli": "^7.23.0",
+    "@babel/core": "^7.23.0",
+    "@babel/plugin-transform-destructuring": "^7.23.0",
+    "@babel/preset-env": "^7.22.20",
+    "@babel/preset-react": "^7.22.15",
+    "@types/node": "^20.8.2",
+    "@types/sharedb": "^3.3.3",
+    "@types/webpack": "^5.28.3",
+    "@typescript-eslint/eslint-plugin": "^6.7.4",
+    "@typescript-eslint/parser": "^6.7.4",
+    "babel-loader": "^9.1.3",
+    "bundle-declarations-webpack-plugin": "^4.0.1",
+    "cross-env": "^7.0.3",
+    "eslint": "^8.50.0",
+    "h5p-types": "^4.2.0",
+    "h5p-utils": "^4.0.0",
+    "regenerator-runtime": "^0.14.0",
+    "resolve-url-loader": "^5.0.0",
+    "ts-loader": "^9.4.4",
+    "ts-node": "^10.9.1",
+    "typescript": "^5.2.2",
+    "webpack": "^5.88.2",
+    "webpack-cli": "^5.1.4"
+  },
+  "dependencies": {
+    "reconnecting": "^4.4.1",
+    "sharedb": "^3.3.2"
+  }
+}
