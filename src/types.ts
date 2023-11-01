@@ -28,3 +28,9 @@ export interface SharedState {
    */
   seed(): void;
 }
+
+export interface PresenceData {
+  userId: string;
+  name: string;
+  level: "anonymous" | "user" | "privileged";
+}

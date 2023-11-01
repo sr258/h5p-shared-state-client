@@ -2,17 +2,35 @@ import ReconnectingWebSocket from "reconnecting";
 import { Connection, Doc } from "sharedb/lib/client";
 import { H5P } from "h5p-utils";
 
-import { IServerConfig, IUserInformation, SharedState } from "./types";
+import {
+  IServerConfig,
+  IUserInformation,
+  PresenceData,
+  SharedState,
+} from "./types";
+import { LocalPresence } from "sharedb/lib/sharedb";
 
 /**
  * This class abstracts the connection to ShareDB for the library. It is
  * reusable across content types.
  */
-export default class SharedStateClient<T extends SharedState> {
+export default class SharedStateClient<
+  StateType extends SharedState,
+  PresenceType extends PresenceData | null = null
+> {
   constructor(
-    contentId: string,
-    private refreshCallback: (data: T) => Promise<void>,
-    private T: { new (): T }
+    private StateType: { new (): StateType },
+    private contentId: string,
+    private callbacks: {
+      onRefresh: (data: StateType) => Promise<void>;
+      onRefreshPresences?: (presences: {
+        [id: string]: PresenceType;
+      }) => Promise<void>;
+      onConnected?: (data: StateType) => Promise<void>;
+      onDeleted?: () => Promise<void>;
+      onError?: (error: string) => Promise<void>;
+    },
+    options?: { enablePresence: boolean }
   ) {
     // The shared-state server configuration is provided by the H5P plugin of
     // the host system. (Must be configured there)
@@ -37,12 +55,16 @@ export default class SharedStateClient<T extends SharedState> {
         if (!this.userInformation) {
           throw new Error("Received invalid user information from server");
         }
+        if (options?.enablePresence) {
+          this.initPresence();
+        }
       }
       return this.userInformation.token
         ? `${serverConfig.serverUrl}?token=${this.userInformation.token}`
         : serverConfig.serverUrl;
     });
 
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     this.connection = new Connection(this.socket as any);
 
     // Create local doc instance mapped to 'h5p' collection document with
@@ -53,32 +75,63 @@ export default class SharedStateClient<T extends SharedState> {
     this.doc.subscribe(this.refresh);
 
     // When document changes (by this client or any other, or the server),
-    // update the number on the page
-    this.doc.on("op", this.refresh);
+    // update
+    this.doc.on("op batch", this.refresh);
+
+    // We need to stop user interaction and notify the user when the state was
+    // deleted
+    this.doc.on("del", async () => {
+      await this.onDeleted();
+    });
+
+    // Notify the user when there are errors
+    this.socket.onerror = async (error) => {
+      this.hadError = true;
+      await this.onError(error.message ?? "No websocket connection to server");
+    };
+
+    // Return to regular view when error was resolved
+    this.socket.onopen = async () => {
+      if (this.hadError) {
+        await this.onConnected(this.doc.data);
+        await this.callbacks?.onRefresh(this.doc.data);
+        this.hadError = false;
+      }
+    };
   }
 
   public userInformation?: IUserInformation;
 
   private socket: ReconnectingWebSocket;
   private connection: Connection;
-  private doc: Doc<T>;
+  private doc: Doc<StateType>;
+  private initial = true;
+  private hadError = false;
+  private myPresence!: LocalPresence<PresenceType>;
+  private otherPresences: { [id: string]: PresenceType } = {};
 
   refresh = async () => {
     if (this.doc.type === null) {
       // If there is no document type, this means that no document has been
       // created so far. The first user who encounters this creates a new
       // document by seeding it and submitting the create op.
-      const newDoc = new this.T();
+      const newDoc = new this.StateType();
       newDoc.seed();
       this.doc.create(newDoc, async (error) => {
         if (error) {
           console.error("Error while creating ShareDB doc: ", error);
+          return;
         } else {
-          await this.refreshCallback(this.doc.data);
+          await this.onConnected(newDoc);
+          await this.callbacks?.onRefresh(this.doc.data);
         }
       });
     } else {
-      await this.refreshCallback(this.doc.data);
+      if (this.initial) {
+        this.initial = false;
+        await this.onConnected(this.doc.data);
+      }
+      await this.callbacks?.onRefresh(this.doc.data);
     }
   };
 
@@ -90,7 +143,56 @@ export default class SharedStateClient<T extends SharedState> {
    * @param data an operation; normally this is a JSON0 op; see
    * <https://github.com/ottypes/json0> for details
    */
-  submitOp = (data: any) => {
+  submitOp = (data: unknown) => {
     this.doc.submitOp(data);
+  };
+
+  submitPresence = async (data: PresenceType) => {
+    this.myPresence.submit(data, (err) => {
+      if (err) {
+        console.error("Error while submitting presence", err);
+      }
+    });
+  };
+
+  private onConnected = async (data: StateType): Promise<void> => {
+    if (this.callbacks?.onConnected) {
+      await this.callbacks?.onConnected(data);
+    }
+  };
+
+  private onError = async (message: string): Promise<void> => {
+    if (this.callbacks?.onError) {
+      await this.callbacks?.onError(message);
+    }
+  };
+
+  private onDeleted = async (): Promise<void> => {
+    if (this.callbacks?.onDeleted) {
+      await this.callbacks?.onDeleted();
+    }
+  };
+
+  private initPresence = async (): Promise<void> => {
+    const presence = this.connection.getPresence(this.contentId.toString());
+    presence.subscribe();
+    presence.on("receive", async (presenceId, update) => {
+      console.log(
+        "Received presence with id",
+        presenceId,
+        ". Updated value: ",
+        update
+      );
+      if (!update) {
+        delete this.otherPresences[presenceId];
+      } else {
+        this.otherPresences[presenceId] = update;
+      }
+      if (this.callbacks.onRefreshPresences) {
+        await this.callbacks.onRefreshPresences(this.otherPresences);
+      }
+    });
+
+    this.myPresence = presence.create();
   };
 }

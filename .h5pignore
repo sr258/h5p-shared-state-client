@@ -1,11 +1,13 @@
 .babelrc
 .dccache
+.eslintignore
+.eslintrc.json
 .git
+.gitignore
 .gitmodules
 .h5pignore
 .idea
 .travis.yml
-.vscode
 build
 CONTRIBUTING.md
 dev
@@ -17,6 +19,9 @@ README.md
 reports
 src
 tests
+TODO.md
+tsconfig.json
 webpack.config.js
 webpack.dev.config.js
 worknotes
+*.h5p
